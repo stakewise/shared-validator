@@ -6,7 +6,6 @@ const {
   ether,
   constants,
   send,
-  time,
 } = require('@openzeppelin/test-helpers');
 const { upgradeContracts } = require('../../deployments');
 const { contractSettings, contracts } = require('../../deployments/settings');
@@ -17,6 +16,7 @@ const {
   checkRewardEthToken,
   setTotalRewards,
   getOracleAccounts,
+  setRewardsVotingPeriod,
 } = require('../utils');
 
 const StakedEthToken = artifacts.require('StakedEthToken');
@@ -339,14 +339,7 @@ contract('RewardEthToken', ([sender, merkleDistributor, ...accounts]) => {
       });
 
       // wait for rewards voting time
-      let newSyncPeriod = new BN('700');
-      await oracles.setSyncPeriod(newSyncPeriod, {
-        from: admin,
-      });
-      let lastUpdateBlockNumber = await rewardEthToken.lastUpdateBlockNumber();
-      await time.advanceBlockTo(
-        lastUpdateBlockNumber.add(new BN(newSyncPeriod))
-      );
+      await setRewardsVotingPeriod(rewardEthToken, oracles, admin);
 
       let totalRewards = (await rewardEthToken.totalRewards()).add(ether('10'));
       let activatedValidators = await pool.activatedValidators();
@@ -388,14 +381,7 @@ contract('RewardEthToken', ([sender, merkleDistributor, ...accounts]) => {
       });
 
       // wait for rewards voting time
-      let newSyncPeriod = new BN('700');
-      await oracles.setSyncPeriod(newSyncPeriod, {
-        from: admin,
-      });
-      let lastUpdateBlockNumber = await rewardEthToken.lastUpdateBlockNumber();
-      await time.advanceBlockTo(
-        lastUpdateBlockNumber.add(new BN(newSyncPeriod))
-      );
+      await setRewardsVotingPeriod(rewardEthToken, oracles, admin);
 
       let totalRewards = (await rewardEthToken.totalRewards()).add(ether('10'));
       let activatedValidators = await pool.activatedValidators();

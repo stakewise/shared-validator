@@ -6,7 +6,6 @@ const {
   ether,
   constants,
   send,
-  time,
 } = require('@openzeppelin/test-helpers');
 const {
   impersonateAccount,
@@ -15,6 +14,7 @@ const {
   checkStakedEthToken,
   getOracleAccounts,
   setTotalRewards,
+  setRewardsVotingPeriod,
 } = require('../utils');
 const { upgradeContracts } = require('../../deployments');
 const { contractSettings, contracts } = require('../../deployments/settings');
@@ -71,6 +71,7 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
 
     it('updates distributor principal when deposited by account with disabled rewards', async () => {
       // disable rewards
+      const currentPrincipal = await stakedEthToken.distributorPrincipal();
       await stakedEthToken.toggleRewards(sender1, true, { from: admin });
       let amount = ether('10');
       let receipt = await pool.addDeposit({
@@ -83,7 +84,7 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
         value: amount,
       });
       expect(await stakedEthToken.distributorPrincipal()).to.bignumber.equal(
-        amount
+        currentPrincipal.add(amount)
       );
     });
   });
@@ -258,6 +259,7 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
 
     it('updates distributor principal when transferring to account with disabled rewards', async () => {
       await stakedEthToken.toggleRewards(sender2, true, { from: admin });
+      const currentPrincipal = await stakedEthToken.distributorPrincipal();
       let receipt = await stakedEthToken.transfer(sender2, value, {
         from: sender1,
       });
@@ -282,12 +284,13 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
         balance: value,
       });
       expect(await stakedEthToken.distributorPrincipal()).to.bignumber.equal(
-        value
+        currentPrincipal.add(value)
       );
     });
 
     it('updates distributor principal when transferring from account with disabled rewards', async () => {
       await stakedEthToken.toggleRewards(sender1, true, { from: admin });
+      const currentPrincipal = await stakedEthToken.distributorPrincipal();
       let receipt = await stakedEthToken.transfer(sender2, value, {
         from: sender1,
       });
@@ -312,13 +315,14 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
         balance: value,
       });
       expect(await stakedEthToken.distributorPrincipal()).to.bignumber.equal(
-        new BN(0)
+        currentPrincipal.sub(value)
       );
     });
 
     it('does not update distributor principal when transferring between accounts with disabled rewards', async () => {
       await stakedEthToken.toggleRewards(sender1, true, { from: admin });
       await stakedEthToken.toggleRewards(sender2, true, { from: admin });
+      const currentPrincipal = await stakedEthToken.distributorPrincipal();
       let receipt = await stakedEthToken.transfer(sender2, value, {
         from: sender1,
       });
@@ -343,7 +347,7 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
         balance: value,
       });
       expect(await stakedEthToken.distributorPrincipal()).to.bignumber.equal(
-        value
+        currentPrincipal
       );
     });
 
@@ -371,14 +375,7 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
       });
 
       // wait for rewards voting time
-      let newSyncPeriod = new BN('700');
-      await oracles.setSyncPeriod(newSyncPeriod, {
-        from: admin,
-      });
-      let lastUpdateBlockNumber = await rewardEthToken.lastUpdateBlockNumber();
-      await time.advanceBlockTo(
-        lastUpdateBlockNumber.add(new BN(newSyncPeriod))
-      );
+      await setRewardsVotingPeriod(rewardEthToken, oracles, admin);
 
       let totalRewards = (await rewardEthToken.totalRewards()).add(ether('10'));
       let activatedValidators = await pool.activatedValidators();
@@ -420,14 +417,7 @@ contract('StakedEthToken', ([merkleDistributor, sender1, sender2]) => {
       });
 
       // wait for rewards voting time
-      let newSyncPeriod = new BN('700');
-      await oracles.setSyncPeriod(newSyncPeriod, {
-        from: admin,
-      });
-      let lastUpdateBlockNumber = await rewardEthToken.lastUpdateBlockNumber();
-      await time.advanceBlockTo(
-        lastUpdateBlockNumber.add(new BN(newSyncPeriod))
-      );
+      await setRewardsVotingPeriod(rewardEthToken, oracles, admin);
 
       let totalRewards = (await rewardEthToken.totalRewards()).add(ether('10'));
       let activatedValidators = await pool.activatedValidators();
